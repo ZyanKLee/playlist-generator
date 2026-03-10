@@ -94,8 +94,12 @@ class DeezerClient:
                 logger.warning("No artist found for %r", name)
                 return None
 
-            # Pick the result whose name matches most closely (case-insensitive)
+            # Pick the result whose name matches exactly (case-insensitive)
             best = _best_match(items, name, key="name")
+            if best is None:
+                logger.warning("No exact artist match for %r (candidates: %s)",
+                               name, [i.get("name") for i in items])
+                return None
             artist = _upsert_artist(db, best)
             return artist
 
@@ -172,6 +176,10 @@ class DeezerClient:
                 return None
 
             best = _best_match(items, title, key="title")
+            if best is None:
+                logger.warning("No exact album match for %r (candidates: %s)",
+                               title, [i.get("title") for i in items])
+                return None
             album = _upsert_album(db, best)
             return album
 
@@ -261,6 +269,10 @@ class DeezerClient:
                 return None
 
             best = _best_match(items, title, key="title")
+            if best is None:
+                logger.warning("No exact track match for %r (candidates: %s)",
+                               title, [i.get("title") for i in items])
+                return None
             track = _upsert_track(db, best)
         # Session is closed; enrich if ISRC missing
         if not track.isrc:
@@ -309,16 +321,19 @@ class DeezerClient:
 # ---------------------------------------------------------------------------
 
 
-def _best_match(items: list[dict], query: str, *, key: str) -> dict:
+def _best_match(items: list[dict], query: str, *, key: str) -> dict | None:
     """Return the item whose *key* field best matches *query* (case-insensitive).
 
-    Falls back to the first item if no exact match is found.
+    Returns the first exact (case-insensitive) match, or ``None`` when no
+    candidate matches.  The previous behaviour of falling back to ``items[0]``
+    caused unrelated artists/tracks to silently pollute generated playlists
+    whenever the searched name was not present in the result set.
     """
     q = query.casefold()
     for item in items:
         if item.get(key, "").casefold() == q:
             return item
-    return items[0]
+    return None
 
 
 def _find_artist_by_name(db: Session, name: str) -> Artist | None:
