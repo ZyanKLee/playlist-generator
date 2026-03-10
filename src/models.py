@@ -1,0 +1,124 @@
+"""SQLAlchemy ORM models.
+
+Supports both SQLite (default) and PostgreSQL transparently because
+SQLAlchemy handles the dialect differences.
+"""
+
+from datetime import datetime, timezone
+
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+)
+from sqlalchemy.orm import DeclarativeBase, relationship
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Association tables (many-to-many)
+# ---------------------------------------------------------------------------
+
+artist_top_tracks = Table(
+    "artist_top_tracks",
+    Base.metadata,
+    Column("artist_id", BigInteger, ForeignKey("artists.id"), primary_key=True),
+    Column("track_id", BigInteger, ForeignKey("tracks.id"), primary_key=True),
+)
+
+playlist_tracks = Table(
+    "playlist_tracks",
+    Base.metadata,
+    Column("playlist_id", Integer, ForeignKey("generated_playlists.id"), primary_key=True),
+    Column("track_id", BigInteger, ForeignKey("tracks.id"), primary_key=True),
+    Column("position", Integer, default=0),
+)
+
+
+# ---------------------------------------------------------------------------
+# Core entities
+# ---------------------------------------------------------------------------
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class Artist(Base):
+    __tablename__ = "artists"
+
+    id = Column(BigInteger, primary_key=True)  # Deezer artist ID
+    name = Column(String, nullable=False, index=True)
+    picture = Column(String, nullable=True)
+    nb_fan = Column(Integer, nullable=True)
+    link = Column(String, nullable=True)
+    cached_at = Column(DateTime, default=_utcnow)
+
+    tracks = relationship("Track", back_populates="artist", foreign_keys="Track.artist_id")
+    top_tracks = relationship("Track", secondary=artist_top_tracks, viewonly=True)
+
+    def __repr__(self) -> str:
+        return f"<Artist id={self.id} name={self.name!r}>"
+
+
+class Album(Base):
+    __tablename__ = "albums"
+
+    id = Column(BigInteger, primary_key=True)  # Deezer album ID
+    title = Column(String, nullable=False, index=True)
+    artist_id = Column(BigInteger, ForeignKey("artists.id"), nullable=True)
+    cover = Column(String, nullable=True)
+    upc = Column(String, nullable=True, index=True)
+    nb_tracks = Column(Integer, nullable=True)
+    cached_at = Column(DateTime, default=_utcnow)
+
+    artist = relationship("Artist")
+    tracks = relationship("Track", back_populates="album")
+
+    def __repr__(self) -> str:
+        return f"<Album id={self.id} title={self.title!r}>"
+
+
+class Track(Base):
+    __tablename__ = "tracks"
+
+    id = Column(BigInteger, primary_key=True)  # Deezer track ID
+    title = Column(String, nullable=False, index=True)
+    artist_id = Column(BigInteger, ForeignKey("artists.id"), nullable=True)
+    album_id = Column(BigInteger, ForeignKey("albums.id"), nullable=True)
+    duration = Column(Integer, nullable=True)   # seconds
+    isrc = Column(String, nullable=True, index=True)
+    rank = Column(Integer, nullable=True)
+    preview = Column(String, nullable=True)     # 30-second preview URL
+    link = Column(String, nullable=True)
+    cached_at = Column(DateTime, default=_utcnow)
+
+    artist = relationship("Artist", back_populates="tracks", foreign_keys=[artist_id])
+    album = relationship("Album", back_populates="tracks")
+
+    def __repr__(self) -> str:
+        return f"<Track id={self.id} title={self.title!r}>"
+
+
+class GeneratedPlaylist(Base):
+    __tablename__ = "generated_playlists"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    public = Column(Boolean, default=False)
+    deezer_playlist_id = Column(BigInteger, nullable=True)
+    created_at = Column(DateTime, default=_utcnow)
+
+    tracks = relationship("Track", secondary=playlist_tracks)
+
+    def __repr__(self) -> str:
+        return f"<GeneratedPlaylist id={self.id} name={self.name!r} tracks={len(self.tracks)}>"

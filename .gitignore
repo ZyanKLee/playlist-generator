@@ -1,0 +1,4 @@
+.env
+output/
+source_data/
+__pycache__/
