@@ -36,6 +36,13 @@ class Config:
             "DEEZER_REDIRECT_URI", "http://localhost:8080/callback"
         )
 
+        # MusicBrainz – used as fallback when Deezer has no exact artist match.
+        # Must identify your application per https://wiki.musicbrainz.org/MusicBrainz_API/Rate_Limiting
+        self.musicbrainz_user_agent: str = os.getenv(
+            "MUSICBRAINZ_USER_AGENT",
+            "playlist-generator/1.0 (https://github.com/ZyanKLee/playlist-generator)",
+        )
+
         # How long cached API responses remain valid (hours)
         self.cache_ttl_hours: int = int(os.getenv("CACHE_TTL_HOURS", "24"))
 

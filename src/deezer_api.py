@@ -241,6 +241,28 @@ class DeezerClient:
     # Track search
     # ------------------------------------------------------------------
 
+    def get_track_by_isrc(self, isrc: str) -> Track | None:
+        """Look up a Deezer track directly by ISRC.
+
+        Uses the ``/track/isrc/{isrc}`` endpoint which is an exact lookup.
+        Returns ``None`` when the ISRC is not in Deezer's catalogue.
+        """
+        with get_session() as db:
+            cached = db.query(Track).filter(Track.isrc == isrc).first()
+            if cached and is_fresh(cached.cached_at):
+                logger.debug("Cache hit (isrc lookup): %s", isrc)
+                return cached
+        try:
+            data = self._get(f"/track/isrc/{isrc}")
+        except DeezerAPIError as exc:
+            logger.debug("ISRC %s not found on Deezer: %s", isrc, exc)
+            return None
+        if not isinstance(data, dict) or "id" not in data:
+            return None
+        with get_session() as db:
+            track = _upsert_track(db, data)
+        return track
+
     def search_track(
         self,
         title: str,
