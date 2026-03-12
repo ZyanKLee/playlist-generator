@@ -23,7 +23,6 @@ import threading
 import urllib.parse
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from pathlib import Path
 
 import requests
 
@@ -109,8 +108,11 @@ def _run_local_oauth_flow() -> str:
     received_code: list[str] = []
     done = threading.Event()
 
-    class Handler(BaseHTTPRequestHandler):
-        def do_GET(self) -> None:  # noqa: N802
+    class Handler(BaseHTTPRequestHandler):  # pylint: disable=too-few-public-methods
+        """Minimal HTTP handler that captures the OAuth callback code."""
+
+        def do_GET(self) -> None:  # noqa: N802  # pylint: disable=invalid-name
+            """Handle the OAuth redirect GET request and extract the auth code."""
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             code = qs.get("code", [""])[0]
             if code:
@@ -162,7 +164,7 @@ def _exchange_code_for_token(code: str) -> str:
     try:
         data = resp.json()
         token = data.get("access_token", "")
-    except Exception:
+    except ValueError:
         qs = urllib.parse.parse_qs(resp.text)
         token = qs.get("access_token", [""])[0]
 

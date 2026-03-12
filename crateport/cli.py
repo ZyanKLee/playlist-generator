@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import csv
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -33,9 +34,11 @@ import click
 
 from .config import config
 from .database import get_session, init_db
+from .deezer_api import DeezerClient
 from .exporter import FORMATS, export, export_all
 from .input_parser import InputMode, parse_input_file
 from .models import Album, Artist, Track, playlist_tracks
+from .musicbrainz_api import MusicBrainzClient
 from .playlist_generator import generate_playlist
 
 
@@ -61,6 +64,7 @@ def cli() -> None:
 # generate subcommand (original behaviour)
 # ---------------------------------------------------------------------------
 
+
 @cli.command("generate")
 @click.argument("input_file", type=click.Path(exists=True, path_type=Path))
 @click.option(
@@ -69,9 +73,16 @@ def cli() -> None:
     default=None,
     help="Input mode (auto-detected if omitted).",
 )
-@click.option("--name", default="Generated Playlist", show_default=True, help="Playlist name.")
+@click.option(
+    "--name", default="Generated Playlist", show_default=True, help="Playlist name."
+)
 @click.option("--description", default="", help="Playlist description.")
-@click.option("--public/--private", default=False, show_default=True, help="Mark playlist public in metadata.")
+@click.option(
+    "--public/--private",
+    default=False,
+    show_default=True,
+    help="Mark playlist public in metadata.",
+)
 @click.option(
     "--limit",
     default=10,
@@ -80,7 +91,8 @@ def cli() -> None:
     help="Max tracks fetched per artist / album.",
 )
 @click.option(
-    "--format", "fmt",
+    "--format",
+    "fmt",
     type=click.Choice(_FORMAT_CHOICES, case_sensitive=False),
     default="all",
     show_default=True,
@@ -101,8 +113,10 @@ def cli() -> None:
     default=None,
     help="Override DATABASE_URL from .env.",
 )
-@click.option("-v", "--verbose", is_flag=True, default=False, help="Enable debug logging.")
-def generate(
+@click.option(
+    "-v", "--verbose", is_flag=True, default=False, help="Enable debug logging."
+)
+def generate(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
     input_file: Path,
     mode: str | None,
     name: str,
@@ -129,7 +143,6 @@ def generate(
     logger = logging.getLogger(__name__)
 
     if db_url:
-        import os
         os.environ["DATABASE_URL"] = db_url
 
     out_dir = output_dir or config.output_dir
@@ -141,7 +154,9 @@ def generate(
     input_mode = InputMode(mode) if mode else None
     parsed = parse_input_file(input_file, mode=input_mode)
     n_entries = len(parsed.artists) or len(parsed.albums) or len(parsed.tracks)
-    click.echo(f"Parsed {input_file.name}: mode={parsed.mode.value}, entries={n_entries}")
+    click.echo(
+        f"Parsed {input_file.name}: mode={parsed.mode.value}, entries={n_entries}"
+    )
 
     playlist = generate_playlist(
         parsed,
@@ -152,7 +167,9 @@ def generate(
     )
 
     tracks_data = _load_tracks_data(playlist.id)
-    click.echo(f"Playlist '{playlist.name}' built: {len(tracks_data)} tracks (db id={playlist.id})")
+    click.echo(
+        f"Playlist '{playlist.name}' built: {len(tracks_data)} tracks (db id={playlist.id})"
+    )
 
     stem = _safe_stem(name)
     if fmt == "all":
@@ -174,9 +191,14 @@ def generate(
 # convert subcommand – VirtualDJ CSV → Soundiiz CSV with ISRC enrichment
 # ---------------------------------------------------------------------------
 
+
 @cli.command("convert")
 @click.argument("input_file", type=click.Path(exists=True, path_type=Path))
-@click.option("--name", default=None, help="Playlist/output file name stem (default: input filename).")
+@click.option(
+    "--name",
+    default=None,
+    help="Playlist/output file name stem (default: input filename).",
+)
 @click.option(
     "--output-dir",
     type=click.Path(path_type=Path),
@@ -190,8 +212,10 @@ def generate(
     metavar="N",
     help="Number of Deezer search candidates to fetch per track.",
 )
-@click.option("-v", "--verbose", is_flag=True, default=False, help="Enable debug logging.")
-def convert(
+@click.option(
+    "-v", "--verbose", is_flag=True, default=False, help="Enable debug logging."
+)
+def convert(  # pylint: disable=too-many-locals
     input_file: Path,
     name: str | None,
     output_dir: Path | None,
@@ -216,9 +240,6 @@ def convert(
     rows = _parse_vdj_csv(input_file)
     click.echo(f"Loaded {len(rows)} tracks from {input_file.name}")
 
-    from .deezer_api import DeezerClient
-    from .musicbrainz_api import MusicBrainzClient
-
     deezer = DeezerClient()
     mb = MusicBrainzClient()
 
@@ -237,7 +258,9 @@ def convert(
         else:
             click.echo("  – No ISRC found, row will be written without one.")
 
-        enriched.append({"title": title, "artist": artist, "album": album, "isrc": isrc or ""})
+        enriched.append(
+            {"title": title, "artist": artist, "album": album, "isrc": isrc or ""}
+        )
 
     stem = _safe_stem(name or input_file.stem)
     out_path = out_dir / f"{stem}.csv"
@@ -251,6 +274,7 @@ def convert(
 # ---------------------------------------------------------------------------
 # VirtualDJ CSV parser
 # ---------------------------------------------------------------------------
+
 
 def _parse_vdj_csv(path: Path) -> list[dict[str, str]]:
     """Parse a VirtualDJ CSV export into a list of track dicts.
@@ -299,6 +323,7 @@ def _parse_vdj_csv(path: Path) -> list[dict[str, str]]:
 # ISRC resolution with interactive disambiguation
 # ---------------------------------------------------------------------------
 
+
 def _resolve_isrc(
     title: str,
     artist: str,
@@ -333,7 +358,9 @@ def _resolve_isrc(
     return isrcs[0] if isrcs else None
 
 
-def _pick_candidate(candidates: list[dict], title: str, artist: str, source: str) -> dict | None:
+def _pick_candidate(
+    candidates: list[dict], title: str, artist: str, source: str
+) -> dict | None:
     """Interactively let the user choose among Deezer *candidates*.
 
     Returns the chosen dict, or ``None`` if the user skips.
@@ -344,14 +371,16 @@ def _pick_candidate(candidates: list[dict], title: str, artist: str, source: str
     tl = title.casefold()
     al = artist.casefold()
     exact = [
-        c for c in candidates
+        c
+        for c in candidates
         if c.get("title", "").casefold() == tl
         and (not al or c.get("artist", {}).get("name", "").casefold() == al)
     ]
     if len(exact) == 1:
         c = exact[0]
         click.echo(
-            f"  → Auto-matched [{source}]: {c.get('artist', {}).get('name', '?')} – {c.get('title', '?')}"
+            f"  \u2192 Auto-matched [{source}]: "
+            f"{c.get('artist', {}).get('name', '?')} \u2013 {c.get('title', '?')}"
         )
         return c
 
@@ -363,11 +392,15 @@ def _pick_candidate(candidates: list[dict], title: str, artist: str, source: str
         click.echo(f"    [{idx}] {a_name} – {c.get('title', '?')}  (album: {alb_name})")
 
     while True:
-        raw = click.prompt(
-            "  Pick number, Enter=1, s=skip",
-            default="1",
-            show_default=False,
-        ).strip().lower()
+        raw = (
+            click.prompt(
+                "  Pick number, Enter=1, s=skip",
+                default="1",
+                show_default=False,
+            )
+            .strip()
+            .lower()
+        )
         if raw == "s":
             return None
         try:
@@ -391,7 +424,8 @@ def _pick_mb_candidate(recordings: list[dict], title: str, artist: str) -> dict 
     tl = title.casefold()
     al = artist.casefold()
     exact = [
-        r for r in pool
+        r
+        for r in pool
         if r.get("title", "").casefold() == tl
         and (
             not al
@@ -424,11 +458,15 @@ def _pick_mb_candidate(recordings: list[dict], title: str, artist: str) -> dict 
         click.echo(f"    [{idx}] {credit} – {r.get('title', '?')}  ({isrc_str})")
 
     while True:
-        raw = click.prompt(
-            "  Pick number, Enter=1, s=skip",
-            default="1",
-            show_default=False,
-        ).strip().lower()
+        raw = (
+            click.prompt(
+                "  Pick number, Enter=1, s=skip",
+                default="1",
+                show_default=False,
+            )
+            .strip()
+            .lower()
+        )
         if raw == "s":
             return None
         try:
@@ -443,6 +481,7 @@ def _pick_mb_candidate(recordings: list[dict], title: str, artist: str) -> dict 
 # ---------------------------------------------------------------------------
 # Soundiiz CSV writer
 # ---------------------------------------------------------------------------
+
 
 def _write_soundiiz_csv(tracks: list[dict[str, str]], path: Path) -> None:
     """Write *tracks* as a Soundiiz-compatible CSV (title,artist,album,isrc)."""

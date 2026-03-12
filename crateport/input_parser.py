@@ -31,6 +31,8 @@ logger = logging.getLogger(__name__)
 
 
 class InputMode(str, Enum):
+    """Supported input file modes."""
+
     ARTISTS = "artists"
     ALBUMS = "albums"
     TRACKS = "tracks"
@@ -38,11 +40,15 @@ class InputMode(str, Enum):
 
 @dataclass
 class ArtistEntry:
+    """A single artist entry parsed from an artist-list input file."""
+
     artist: str
 
 
 @dataclass
 class AlbumEntry:
+    """A single album entry parsed from an album-list CSV."""
+
     title: str
     artist: str
     upc: str = ""
@@ -50,6 +56,8 @@ class AlbumEntry:
 
 @dataclass
 class TrackEntry:
+    """A single track entry parsed from a track-list CSV."""
+
     title: str
     artist: str = ""
     album: str = ""
@@ -58,13 +66,19 @@ class TrackEntry:
 
 @dataclass
 class ParsedInput:
+    """Container for all entries parsed from an input file."""
+
     mode: InputMode
     artists: list[ArtistEntry] = field(default_factory=list)
     albums: list[AlbumEntry] = field(default_factory=list)
     tracks: list[TrackEntry] = field(default_factory=list)
 
 
-def parse_input_file(path: str | Path, mode: InputMode | None = None) -> ParsedInput:
+def parse_input_file(
+    path: str | Path, mode: InputMode | None = None
+) -> (
+    ParsedInput
+):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """Parse *path* and return a :class:`ParsedInput`.
 
     When *mode* is ``None`` (default) the format is auto-detected.
@@ -152,8 +166,12 @@ def parse_input_file(path: str | Path, mode: InputMode | None = None) -> ParsedI
                 result.tracks.append(
                     TrackEntry(
                         title=title,
-                        artist=_safe_get(row, artist_col) if artist_col is not None else "",
-                        album=_safe_get(row, album_col) if album_col is not None else "",
+                        artist=(
+                            _safe_get(row, artist_col) if artist_col is not None else ""
+                        ),
+                        album=(
+                            _safe_get(row, album_col) if album_col is not None else ""
+                        ),
                         isrc=_safe_get(row, isrc_col) if isrc_col is not None else "",
                     )
                 )
@@ -177,7 +195,9 @@ def parse_input_file(path: str | Path, mode: InputMode | None = None) -> ParsedI
 def _detect_mode(header_fields: list[str]) -> InputMode:
     if not header_fields:
         return InputMode.ARTISTS
-    if header_fields == ["artist"] or (len(header_fields) == 1 and "artist" in header_fields[0]):
+    if header_fields == ["artist"] or (
+        len(header_fields) == 1 and "artist" in header_fields[0]
+    ):
         return InputMode.ARTISTS
     if "title" not in header_fields:
         return InputMode.ARTISTS
@@ -191,9 +211,9 @@ def _detect_mode(header_fields: list[str]) -> InputMode:
 def _col(fields: list[str], name: str, *, required: bool = True) -> int | None:
     try:
         return fields.index(name)
-    except ValueError:
+    except ValueError as exc:
         if required:
-            raise ValueError(f"Expected column {name!r} in header {fields}")
+            raise ValueError(f"Expected column {name!r} in header {fields}") from exc
         return None
 
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime, timezone
 from typing import Any
 
 import requests
@@ -55,7 +56,9 @@ class DeezerClient:
         data = resp.json()
         if isinstance(data, dict) and "error" in data:
             err = data["error"]
-            raise DeezerAPIError(f"{err.get('type', 'Error')} {err.get('code')}: {err.get('message')}")
+            raise DeezerAPIError(
+                f"{err.get('type', 'Error')} {err.get('code')}: {err.get('message')}"
+            )
         return data
 
     def _post(self, path: str, params: dict[str, Any] | None = None) -> Any:
@@ -69,7 +72,9 @@ class DeezerClient:
         data = resp.json()
         if isinstance(data, dict) and "error" in data:
             err = data["error"]
-            raise DeezerAPIError(f"{err.get('type', 'Error')} {err.get('code')}: {err.get('message')}")
+            raise DeezerAPIError(
+                f"{err.get('type', 'Error')} {err.get('code')}: {err.get('message')}"
+            )
         return data
 
     # ------------------------------------------------------------------
@@ -97,8 +102,11 @@ class DeezerClient:
             # Pick the result whose name matches exactly (case-insensitive)
             best = _best_match(items, name, key="name")
             if best is None:
-                logger.warning("No exact artist match for %r (candidates: %s)",
-                               name, [i.get("name") for i in items])
+                logger.warning(
+                    "No exact artist match for %r (candidates: %s)",
+                    name,
+                    [i.get("name") for i in items],
+                )
                 return None
             artist = _upsert_artist(db, best)
             return artist
@@ -177,8 +185,11 @@ class DeezerClient:
 
             best = _best_match(items, title, key="title")
             if best is None:
-                logger.warning("No exact album match for %r (candidates: %s)",
-                               title, [i.get("title") for i in items])
+                logger.warning(
+                    "No exact album match for %r (candidates: %s)",
+                    title,
+                    [i.get("title") for i in items],
+                )
                 return None
             album = _upsert_album(db, best)
             return album
@@ -188,9 +199,7 @@ class DeezerClient:
         with get_session() as db:
             album: Album | None = db.get(Album, album_id)
             if album and is_fresh(album.cached_at):
-                existing = (
-                    db.query(Track).filter(Track.album_id == album_id).all()
-                )
+                existing = db.query(Track).filter(Track.album_id == album_id).all()
                 if existing:
                     logger.debug("Cache hit: tracks for album %s", album_id)
                     return existing
@@ -313,8 +322,11 @@ class DeezerClient:
 
             best = _best_match(items, title, key="title")
             if best is None:
-                logger.warning("No exact track match for %r (candidates: %s)",
-                               title, [i.get("title") for i in items])
+                logger.warning(
+                    "No exact track match for %r (candidates: %s)",
+                    title,
+                    [i.get("title") for i in items],
+                )
                 return None
             track = _upsert_track(db, best)
         # Session is closed; enrich if ISRC missing
@@ -384,7 +396,6 @@ def _find_artist_by_name(db: Session, name: str) -> Artist | None:
 
 
 def _upsert_artist(db: Session, data: dict) -> Artist:
-    from datetime import datetime, timezone
     artist = Artist(
         id=data["id"],
         name=data["name"],
@@ -397,7 +408,6 @@ def _upsert_artist(db: Session, data: dict) -> Artist:
 
 
 def _upsert_album(db: Session, data: dict, artist_id: int | None = None) -> Album:
-    from datetime import datetime, timezone
     if "artist" in data and isinstance(data["artist"], dict):
         art = _upsert_artist(db, data["artist"])
         artist_id = art.id
@@ -414,7 +424,6 @@ def _upsert_album(db: Session, data: dict, artist_id: int | None = None) -> Albu
 
 
 def _upsert_track(db: Session, data: dict, album_id: int | None = None) -> Track:
-    from datetime import datetime, timezone
     # Resolve nested artist/album if present
     art_id: int | None = None
     if "artist" in data and isinstance(data["artist"], dict):

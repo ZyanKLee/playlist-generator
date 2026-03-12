@@ -46,7 +46,7 @@ def _artist_name_matches(track: Track, expected: str) -> tuple[bool, str | None]
         return matches, artist.name
 
 
-def generate_playlist(
+def generate_playlist(  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches,too-many-statements,too-many-nested-blocks
     parsed: ParsedInput,
     *,
     client: DeezerClient | None = None,
@@ -113,9 +113,7 @@ def generate_playlist(
                 continue
 
             # ---- MusicBrainz fallback ----------------------------------------
-            logger.info(
-                "Falling back to MusicBrainz for artist: %s", entry.artist
-            )
+            logger.info("Falling back to MusicBrainz for artist: %s", entry.artist)
             mb_artist = mb_client.search_artist(entry.artist)
             if mb_artist is None:
                 logger.warning(
@@ -209,7 +207,7 @@ def generate_playlist(
         for t in tracks:
             try:
                 db.expunge(t)
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 pass
 
     logger.info(

@@ -28,7 +28,7 @@ import csv
 import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .models import GeneratedPlaylist
@@ -84,7 +84,9 @@ def export(
     }
     fn = exporters.get(fmt.lower())
     if fn is None:
-        raise ValueError(f"Unknown export format {fmt!r}. Choose from: {', '.join(exporters)}")
+        raise ValueError(
+            f"Unknown export format {fmt!r}. Choose from: {', '.join(exporters)}"
+        )
 
     return fn(playlist, tracks, output_dir / stem)
 
@@ -194,7 +196,7 @@ def _export_m3u(
 
 
 def _export_csv(
-    playlist: "GeneratedPlaylist",
+    _playlist: "GeneratedPlaylist",
     tracks: list[TrackData],
     dest: Path,
 ) -> Path:
@@ -208,12 +210,14 @@ def _export_csv(
         writer = csv.writer(fh)
         writer.writerow(["title", "artist", "album", "isrc"])
         for t in tracks:
-            writer.writerow([
-                t.get("title", ""),
-                t.get("artist", ""),
-                t.get("album", ""),
-                t.get("isrc", ""),
-            ])
+            writer.writerow(
+                [
+                    t.get("title", ""),
+                    t.get("artist", ""),
+                    t.get("album", ""),
+                    t.get("isrc", ""),
+                ]
+            )
     return dest
 
 

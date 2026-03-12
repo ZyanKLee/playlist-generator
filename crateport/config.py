@@ -12,7 +12,7 @@ OUTPUT_DIR = CWD / "output"
 SOURCE_DATA_DIR = CWD / "source_data"
 
 
-class Config:
+class Config:  # pylint: disable=too-many-instance-attributes,too-few-public-methods
     """Central configuration object.
 
     Values are read from environment variables; a ``.env`` file placed at the
@@ -39,7 +39,8 @@ class Config:
         )
 
         # MusicBrainz – used as fallback when Deezer has no exact artist match.
-        # Must identify your application per https://wiki.musicbrainz.org/MusicBrainz_API/Rate_Limiting
+        # Must identify your application per the MusicBrainz API rate-limiting policy:
+        # https://wiki.musicbrainz.org/MusicBrainz_API/Rate_Limiting
         self.musicbrainz_user_agent: str = os.getenv(
             "MUSICBRAINZ_USER_AGENT",
             "crateport/1.0 (https://github.com/ZyanKLee/crateport)",

@@ -19,9 +19,7 @@ logger = logging.getLogger(__name__)
 
 _BASE = "https://musicbrainz.org/ws/2"
 _RATE_LIMIT_DELAY = 1.1  # seconds — MusicBrainz requires max 1 req/s
-_DEFAULT_USER_AGENT = (
-    "crateport/1.0 (https://github.com/ZyanKLee/crateport)"
-)
+_DEFAULT_USER_AGENT = "crateport/1.0 (https://github.com/ZyanKLee/crateport)"
 
 
 class MusicBrainzError(Exception):
@@ -112,9 +110,7 @@ class MusicBrainzClient:
         )
         return recordings
 
-    def get_artist_recordings(
-        self, mbid: str, limit: int = 10
-    ) -> list[dict]:
+    def get_artist_recordings(self, mbid: str, limit: int = 10) -> list[dict]:
         """Return up to *limit* recordings for the given MusicBrainz artist MBID.
 
         Recordings include their ISRCs via ``inc=isrcs``.  The MusicBrainz
