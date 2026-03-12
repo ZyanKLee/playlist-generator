@@ -21,7 +21,21 @@ No Deezer application credentials required. API responses are cached locally in 
 ```bash
 git clone https://github.com/ZyanKLee/crateport.git
 cd crateport
-poetry install
+pipx install .
+```
+
+The `crateport` command is then available globally.
+
+To upgrade after pulling new changes:
+
+```bash
+pipx install . --force
+```
+
+To uninstall:
+
+```bash
+pipx uninstall crateport
 ```
 
 ---
@@ -29,7 +43,7 @@ poetry install
 ## Usage
 
 ```bash
-poetry run python -m src COMMAND [OPTIONS] INPUT_FILE
+crateport COMMAND [OPTIONS] INPUT_FILE
 ```
 
 ### Commands
@@ -44,7 +58,7 @@ poetry run python -m src COMMAND [OPTIONS] INPUT_FILE
 ## `generate`
 
 ```bash
-poetry run python -m src generate INPUT_FILE [OPTIONS]
+crateport generate INPUT_FILE [OPTIONS]
 ```
 
 Queries the Deezer public API to resolve each entry in `INPUT_FILE` to real tracks, caches results locally, and exports the playlist.
@@ -67,17 +81,17 @@ Queries the Deezer public API to resolve each entry in `INPUT_FILE` to real trac
 
 ```bash
 # Generate from an artist list, export all formats (default)
-poetry run python -m src generate source_data/artists.txt
+crateport generate source_data/artists.txt
 
 # Custom name and track limit
-poetry run python -m src generate source_data/artists.txt \
+crateport generate source_data/artists.txt \
     --name "My Techno Mix" --limit 15
 
 # Export only the Deezer-importable CSV
-poetry run python -m src generate source_data/artists.txt --format csv
+crateport generate source_data/artists.txt --format csv
 
 # Albums CSV input, export as XSPF
-poetry run python -m src generate source_data/albums.csv --mode albums --format xspf
+crateport generate source_data/albums.csv --mode albums --format xspf
 ```
 
 ### Input formats for `generate`
@@ -141,7 +155,7 @@ Deezer matches by ISRC first, then falls back to title + artist.
 ## `convert`
 
 ```bash
-poetry run python -m src convert INPUT_FILE [OPTIONS]
+crateport convert INPUT_FILE [OPTIONS]
 ```
 
 Reads a VirtualDJ CSV export (columns: `Titel`, `Interpret`, `Album`, `BPM`, `Key`), looks up each track on Deezer and MusicBrainz to obtain its ISRC, and writes a Soundiiz-compatible CSV.
@@ -160,7 +174,7 @@ Reads a VirtualDJ CSV export (columns: `Titel`, `Interpret`, `Album`, `BPM`, `Ke
 ### Example
 
 ```bash
-poetry run python -m src convert "source_data/2026-03-13 My Set.csv" \
+crateport convert "source_data/2026-03-13 My Set.csv" \
     --name "My_Set_2026-03-13"
 ```
 
@@ -216,7 +230,7 @@ cp .env.example .env
 
 ```
 crateport/
-├── src/
+├── crateport/
 │   ├── cli.py                 # Click CLI – 'generate' and 'convert' subcommands
 │   ├── config.py              # Environment-based configuration
 │   ├── models.py              # SQLAlchemy ORM models (Artist, Album, Track, Playlist)

@@ -1,7 +1,7 @@
 [project]
 name = "crateport"
 version = "0.1.0"
-description = ""
+description = "DJ-focused playlist tool: generate from artist/track lists or convert VirtualDJ exports to Soundiiz-ready CSVs with ISRC enrichment."
 authors = [
     {name = "Phillip Stockmann",email = "zyanklee@gmail.com"}
 ]
@@ -13,6 +13,9 @@ dependencies = [
     "python-dotenv (>=1.0,<2.0)"
 ]
 
+[project.scripts]
+crateport = "crateport.cli:cli"
+
 [dependency-groups]
 dev = [
     "black (>=26.3.0,<27.0.0)",
@@ -22,7 +25,8 @@ dev = [
 
 
 [tool.poetry]
-package-mode = false
+name = "crateport"
+packages = [{include = "crateport"}]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
