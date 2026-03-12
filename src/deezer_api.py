@@ -263,6 +263,27 @@ class DeezerClient:
             track = _upsert_track(db, data)
         return track
 
+    def search_track_candidates(
+        self,
+        title: str,
+        artist: str | None = None,
+        limit: int = 5,
+    ) -> list[dict[str, Any]]:
+        """Return up to *limit* raw Deezer search results for *title* / *artist*.
+
+        Unlike :meth:`search_track`, nothing is persisted and no "best match"
+        heuristic is applied, so the caller can do interactive disambiguation.
+        Each result dict contains at minimum: ``id``, ``title``, ``artist``
+        (nested dict with ``name``), ``album`` (nested dict with ``title``).
+        The ``isrc`` key is **absent** from bulk search results; call
+        :meth:`get_track` on the chosen ID to retrieve a full ISRC.
+        """
+        query = f'track:"{title}"'
+        if artist:
+            query += f' artist:"{artist}"'
+        data = self._get("/search/track", {"q": query, "limit": limit})
+        return data.get("data", [])
+
     def search_track(
         self,
         title: str,

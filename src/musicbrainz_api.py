@@ -89,6 +89,29 @@ class MusicBrainzClient:
     # Recordings
     # ------------------------------------------------------------------
 
+    def search_recording(
+        self,
+        title: str,
+        artist: str | None = None,
+        limit: int = 5,
+    ) -> list[dict]:
+        """Search for recordings by title (and optionally artist).
+
+        Returns up to *limit* recording dicts.  Each may include an
+        ``isrcs`` list when the recording has registered ISRCs in
+        MusicBrainz.  The ``artist-credit`` key carries the credited
+        artists as a list of dicts.
+        """
+        query = f'recording:"{title}"'
+        if artist:
+            query += f' AND artist:"{artist}"'
+        data = self._get("/recording", {"query": query, "inc": "isrcs", "limit": limit})
+        recordings: list[dict] = data.get("recordings", [])
+        logger.debug(
+            "MusicBrainz: search_recording %r → %d results", title, len(recordings)
+        )
+        return recordings
+
     def get_artist_recordings(
         self, mbid: str, limit: int = 10
     ) -> list[dict]:
