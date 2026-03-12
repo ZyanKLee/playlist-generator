@@ -38,6 +38,32 @@ To uninstall:
 pipx uninstall crateport
 ```
 
+### Working directory
+
+crateport always reads and writes relative to **where you run the command**, regardless of where it is installed:
+
+| Path | Purpose |
+|------|---------|
+| `./output/` | Generated CSVs, XSPF, M3U, JSON, and `cache.db` — created automatically |
+| `./source_data/` | Convenient place for input files — created automatically, not required |
+| `./.env` | Optional configuration overrides (see [Configuration](#configuration)) |
+
+So a typical working setup looks like:
+
+```
+~/my-sets/
+├── source_data/
+│   └── 2026-03-13 My Set.csv
+├── output/          ← created on first run
+└── .env             ← optional
+```
+
+```bash
+cd ~/my-sets
+crateport convert "source_data/2026-03-13 My Set.csv" --name "My_Set_2026-03-13"
+# → output/My_Set_2026-03-13.csv
+```
+
 ---
 
 ## Usage
@@ -243,8 +269,6 @@ crateport/
 │   └── auth.py                # Deezer OAuth flow (for future use)
 ├── source_data/               # Put your input files here
 ├── output/                    # Generated playlists and cache.db land here
-├── docs/
-│   └── project_plan.md
 ├── .env.example
 ├── pyproject.toml
 └── README.md

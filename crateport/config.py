@@ -5,9 +5,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-ROOT_DIR = Path(__file__).parent.parent
-OUTPUT_DIR = ROOT_DIR / "output"
-SOURCE_DATA_DIR = ROOT_DIR / "source_data"
+# When installed (e.g. via pipx), __file__ is deep inside the virtualenv.
+# All user-facing paths must be relative to the *working directory* instead.
+CWD = Path.cwd()
+OUTPUT_DIR = CWD / "output"
+SOURCE_DATA_DIR = CWD / "source_data"
 
 
 class Config:
@@ -18,7 +20,7 @@ class Config:
     """
 
     def __init__(self) -> None:
-        load_dotenv(ROOT_DIR / ".env")
+        load_dotenv(CWD / ".env")
 
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         SOURCE_DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -48,7 +50,7 @@ class Config:
 
         self.output_dir: Path = OUTPUT_DIR
         self.source_data_dir: Path = SOURCE_DATA_DIR
-        self.root_dir: Path = ROOT_DIR
+        self.cwd: Path = CWD
 
 
 config = Config()
