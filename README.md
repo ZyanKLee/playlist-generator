@@ -2,8 +2,8 @@
 
 A DJ-focused playlist tool with two workflows:
 
-- **`generate`** — build a playlist from a list of artists, albums, or tracks using the Deezer public API, then export it to XSPF / M3U / CSV / JSON.
-- **`convert`** — take a VirtualDJ CSV export, enrich every track with an ISRC via Deezer (falling back to MusicBrainz), and produce a Soundiiz-compatible CSV ready for import into Deezer or any other streaming platform.
+- **`generate`** — build a playlist from a list of artists, albums, or tracks using the Deezer public API, then export it to XSPF / M3U / CSV / JSON. See [docs/generate.md](docs/generate.md) for details.
+- **`convert`** — take a VirtualDJ CSV export, enrich every track with an ISRC via Deezer (falling back to MusicBrainz), and produce a Soundiiz-compatible CSV ready for import into Deezer or any other streaming platform. See [docs/convert.md](docs/convert.md) for details.
 
 No Deezer application credentials required. API responses are cached locally in SQLite.
 
@@ -79,7 +79,7 @@ cp .env.example .env
 | `MUSICBRAINZ_USER_AGENT` | built-in | User-Agent sent to MusicBrainz (identify your instance) |
 | `DEEZER_APP_ID` | *(empty)* | Reserved for future direct Deezer push (not required for file export) |
 | `DEEZER_SECRET` | *(empty)* | Reserved for future direct Deezer push |
-| `DEEZER_REDIRECT_URI` | `http://localhost:8080/callback` | OAuth callback URI |
+| `DEEZER_REDIRECT_URI` | `http://localhost:8080/callback` | Reserved for future direct Deezer push |
 
 ---
 
