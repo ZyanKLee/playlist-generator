@@ -1,6 +1,6 @@
 [project]
 name = "crateport"
-version = "0.1.1"
+version = "1.0.0"
 description = "DJ-focused playlist tool: generate from artist/track lists or convert VirtualDJ exports to Soundiiz-ready CSVs with ISRC enrichment."
 authors = [
     {name = "Phillip Stockmann",email = "ZyanKLee@users.noreply.github.com"}
@@ -10,7 +10,7 @@ repository = "https://github.com/ZyanKLee/crateport"
 license = {file = "LICENSE"}
 readme = "README.md"
 keywords = ["deezer", "playlist", "csv", "music"]
-requires-python = ">=3.14"
+requires-python = ">=3.14,<4.0"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -32,6 +32,7 @@ black = ">=26.3.0,<27.0.0"
 pylint = ">=4.0.5,<5.0.0"
 isort = ">=8.0.1,<9.0.0"
 git-cliff = "^2.12.0"
+python-semantic-release = "^10.5.3"
 
 
 [tool.poetry]
@@ -41,6 +42,19 @@ packages = [{include = "crateport"}]
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+branch = "main"
+changelog_file = "CHANGELOG.md"
+build_command = "poetry build"
+commit_message = "chore(release): v{version}"
+tag_format = "v{version}"
+
+[tool.semantic_release.commit_parser_options]
+allowed_tags = ["feat", "fix", "perf", "refactor", "docs", "style", "test", "chore", "ci"]
+minor_tags = ["feat"]
+patch_tags = ["fix", "perf"]
 
 [tool.poetry.scripts]
 changelog = "scripts:generate_changelog"
