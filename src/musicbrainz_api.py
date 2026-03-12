@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 _BASE = "https://musicbrainz.org/ws/2"
 _RATE_LIMIT_DELAY = 1.1  # seconds — MusicBrainz requires max 1 req/s
 _DEFAULT_USER_AGENT = (
-    "playlist-generator/1.0 (https://github.com/your-org/playlist-generator)"
+    "crateport/1.0 (https://github.com/ZyanKLee/crateport)"
 )
 
 

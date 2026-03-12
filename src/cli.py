@@ -54,7 +54,7 @@ _FORMAT_CHOICES = list(FORMATS) + ["all"]
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 def cli() -> None:
-    """Playlist generator – generate or convert playlists for Deezer / Soundiiz."""
+    """crateport – generate or convert playlists for Deezer / Soundiiz."""
 
 
 # ---------------------------------------------------------------------------

@@ -40,7 +40,7 @@ class Config:
         # Must identify your application per https://wiki.musicbrainz.org/MusicBrainz_API/Rate_Limiting
         self.musicbrainz_user_agent: str = os.getenv(
             "MUSICBRAINZ_USER_AGENT",
-            "playlist-generator/1.0 (https://github.com/ZyanKLee/playlist-generator)",
+            "crateport/1.0 (https://github.com/ZyanKLee/crateport)",
         )
 
         # How long cached API responses remain valid (hours)

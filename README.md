@@ -1,4 +1,4 @@
-# playlist-generator
+# crateport
 
 Generate playlists from a list of artists, albums, or tracks using the **Deezer public API** — no application credentials required. Results are cached locally in SQLite and exported to standard playlist formats that can be imported into Deezer (or opened in any media player).
 
@@ -33,8 +33,8 @@ Deezer matches tracks by ISRC first (exact match), then falls back to title + ar
 ## Installation
 
 ```bash
-git clone https://github.com/your-username/playlist-generator.git
-cd playlist-generator
+git clone https://github.com/your-username/crateport.git
+cd crateport
 poetry install
 ```
 
@@ -181,7 +181,7 @@ cp .env.example .env
 ## Project structure
 
 ```
-playlist-generator/
+crateport/
 ├── src/
 │   ├── config.py           # Environment-based configuration
 │   ├── models.py           # SQLAlchemy ORM models (Artist, Album, Track, Playlist)
