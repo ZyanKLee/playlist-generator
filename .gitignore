@@ -2,3 +2,5 @@
 output/
 source_data/
 __pycache__/
+dist/
+.vscode/

@@ -91,4 +91,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for project structure and development set
 
 ## License
 
-MIT License © 2024 Zyan K. Lee
+MIT License © 2026 Zyan K. Lee
