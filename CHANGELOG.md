@@ -1,12 +1,23 @@
 # CHANGELOG
 
 
-## Unreleased
+## v1.0.1 (2026-03-13)
 
 ### Chores
 
+- Downgrade version to 1.0.0 and add .envrc to .gitignore
+  ([`ce75cf7`](https://github.com/ZyanKLee/crateport/commit/ce75cf7f11a3c45a2bcb8e4646470e62ca8e7dba))
+
 - Update CHANGELOG generation method and versioning
   ([`1bd4317`](https://github.com/ZyanKLee/crateport/commit/1bd431761543b185c7adf9adf80cedfe27dbf551))
+
+- Update semantic release changelog configuration and templates
+  ([`5e650e4`](https://github.com/ZyanKLee/crateport/commit/5e650e4af86b622427244b9493318c85c08a1267))
+
+### Documentation
+
+- Add release process and commit message guidelines to CONTRIBUTING.md
+  ([`24dfe40`](https://github.com/ZyanKLee/crateport/commit/24dfe402b30120dd54f0f9cc5da8ac18c90c1af3))
 
 
 ## v1.0.0 (2026-03-13)
