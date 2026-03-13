@@ -52,20 +52,13 @@ tag_format = "v{version}"
 upload_to_vcs_release = false
 
 [tool.semantic_release.changelog]
+mode = "init"
 exclude_commit_patterns = [
-    "^chore\\(release\\):",   # skip the release commits themselves
+    "^chore\\(release\\):",
 ]
 
-[tool.semantic_release.changelog.default_templates.changelog_sections]
-feat = "Features"
-fix = "Bug Fixes"
-perf = "Performance"
-refactor = "Refactoring"
-docs = "Documentation"
-style = "Style"
-test = "Testing"
-chore = "Miscellaneous"
-ci = "CI/CD"
+[tool.semantic_release.changelog.default_templates]
+mask_initial_release = false
 
 [tool.semantic_release.commit_parser_options]
 allowed_tags = ["feat", "fix", "perf", "refactor", "docs", "style", "test", "chore", "ci"]
