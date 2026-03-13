@@ -1,6 +1,6 @@
 [project]
 name = "crateport"
-version = "1.0.2"
+version = "1.0.3"
 description = "DJ-focused playlist tool: generate from artist/track lists or convert VirtualDJ exports to Soundiiz-ready CSVs with ISRC enrichment."
 authors = [
     {name = "Phillip Stockmann",email = "ZyanKLee@users.noreply.github.com"}
