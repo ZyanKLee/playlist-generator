@@ -55,3 +55,64 @@ After making changes, reinstall with pipx:
 ```bash
 pipx install . --force
 ```
+
+## Release process
+
+Releases are managed by [python-semantic-release](https://python-semantic-release.readthedocs.io/).
+It reads **Conventional Commits** since the last tag to decide the version bump automatically:
+
+| Commit type | Version bump |
+|---|---|
+| `fix:`, `perf:` | patch (0.0.x) |
+| `feat:` | minor (0.x.0) |
+| `feat!:` or `BREAKING CHANGE:` footer | major (x.0.0) |
+| `chore:`, `docs:`, `refactor:`, etc. | no release triggered |
+
+### Commit message format
+
+```
+<type>(<optional scope>): <short description>
+
+# Examples:
+feat(cli): add --dry-run flag
+fix(deezer): handle 404 on track lookup
+docs: update README with auth instructions
+chore: bump dependencies
+refactor!: rename config fields  ← triggers major bump
+```
+
+### Cutting a release
+
+```bash
+# 1. Check what the next version would be (dry run, no changes)
+poetry run semantic-release version --print
+
+# 2. Cut the release locally (bumps pyproject.toml, updates CHANGELOG.md,
+#    commits, tags, and builds dist/)
+poetry run semantic-release version --changelog --no-push
+
+# 3. Verify everything looks good
+git log --oneline -3
+cat CHANGELOG.md
+ls dist/
+
+# 4. Push commits and tag
+git push origin main --tags
+
+# 5. Publish to PyPI
+poetry publish
+```
+
+### Refresh the changelog without releasing
+
+```bash
+poetry run semantic-release changelog
+```
+
+### Force a specific bump (override auto-detection)
+
+```bash
+poetry run semantic-release version --changelog --no-push --patch
+poetry run semantic-release version --changelog --no-push --minor
+poetry run semantic-release version --changelog --no-push --major
+```
