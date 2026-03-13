@@ -87,21 +87,19 @@ refactor!: rename config fields  ← triggers major bump
 # 1. Check what the next version would be (dry run, no changes)
 poetry run semantic-release version --print
 
-# 2. Cut the release locally (bumps pyproject.toml, updates CHANGELOG.md,
-#    commits, tags, and builds dist/)
-poetry run semantic-release version --changelog --no-push
-
-# 3. Verify everything looks good
-git log --oneline -3
-cat CHANGELOG.md
-ls dist/
-
-# 4. Push commits and tag
-git push origin main --tags
-
-# 5. Publish to PyPI
-poetry publish
+# 2. Cut the release: bumps pyproject.toml, updates CHANGELOG.md,
+#    commits, tags, builds dist/, pushes to GitHub, and creates
+#    a GitHub Release with dist/*.whl and dist/*.tar.gz attached
+GH_TOKEN=your_token poetry run semantic-release version --changelog
+GH_TOKEN=your_token poetry run semantic-release publish
 ```
+
+Pushing the tag triggers `.github/workflows/release.yml`, which builds and
+publishes to PyPI automatically via Trusted Publishing (no token required).
+
+> **Tip:** Set `GH_TOKEN` in your shell session once (`export GH_TOKEN=ghp_...`)
+> so you don't have to prefix every command.
+
 
 ### Refresh the changelog without releasing
 
@@ -112,7 +110,7 @@ poetry run semantic-release changelog
 ### Force a specific bump (override auto-detection)
 
 ```bash
-poetry run semantic-release version --changelog --no-push --patch
-poetry run semantic-release version --changelog --no-push --minor
-poetry run semantic-release version --changelog --no-push --major
+GH_TOKEN=your_token poetry run semantic-release version --changelog --patch
+GH_TOKEN=your_token poetry run semantic-release version --changelog --minor
+GH_TOKEN=your_token poetry run semantic-release version --changelog --major
 ```
