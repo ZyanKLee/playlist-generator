@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.2 (2026-03-13)
+
+### Features
+
+- Add GitHub Actions workflow for automated PyPI releases
+  ([`77a1885`](https://github.com/ZyanKLee/crateport/commit/77a188587725710b1bdda714b6bb74a723838077))
+
+
 ## v1.0.1 (2026-03-13)
 
 ### Chores
