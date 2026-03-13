@@ -1,6 +1,6 @@
 [project]
 name = "crateport"
-version = "1.0.0"
+version = "1.0.3"
 description = "DJ-focused playlist tool: generate from artist/track lists or convert VirtualDJ exports to Soundiiz-ready CSVs with ISRC enrichment."
 authors = [
     {name = "Phillip Stockmann",email = "ZyanKLee@users.noreply.github.com"}
@@ -31,7 +31,6 @@ crateport = "crateport.cli:cli"
 black = ">=26.3.0,<27.0.0"
 pylint = ">=4.0.5,<5.0.0"
 isort = ">=8.0.1,<9.0.0"
-git-cliff = "^2.12.0"
 python-semantic-release = "^10.5.3"
 
 
@@ -50,11 +49,25 @@ changelog_file = "CHANGELOG.md"
 build_command = "poetry build"
 commit_message = "chore(release): v{version}"
 tag_format = "v{version}"
+upload_to_vcs_release = false
+
+[tool.semantic_release.changelog]
+exclude_commit_patterns = [
+    "^chore\\(release\\):",   # skip the release commits themselves
+]
+
+[tool.semantic_release.changelog.default_templates.changelog_sections]
+feat = "Features"
+fix = "Bug Fixes"
+perf = "Performance"
+refactor = "Refactoring"
+docs = "Documentation"
+style = "Style"
+test = "Testing"
+chore = "Miscellaneous"
+ci = "CI/CD"
 
 [tool.semantic_release.commit_parser_options]
 allowed_tags = ["feat", "fix", "perf", "refactor", "docs", "style", "test", "chore", "ci"]
 minor_tags = ["feat"]
 patch_tags = ["fix", "perf"]
-
-[tool.poetry.scripts]
-changelog = "scripts:generate_changelog"
