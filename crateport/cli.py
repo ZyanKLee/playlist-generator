@@ -23,21 +23,20 @@ How to import into Deezer via Soundiiz
 
 from __future__ import annotations
 
-import csv
 import logging
 import os
 import sys
 from pathlib import Path
-from typing import Any
 
 import click
 
 from .config import config
-from .database import get_session, init_db
+from .converter import parse_vdj_csv, write_soundiiz_csv
+from .database import init_db, load_tracks_data
 from .deezer_api import DeezerClient
 from .exporter import FORMATS, export, export_all
 from .input_parser import InputMode, parse_input_file
-from .models import Album, Artist, Track, playlist_tracks
+from .isrc_resolver import resolve_isrc
 from .musicbrainz_api import MusicBrainzClient
 from .playlist_generator import generate_playlist
 
@@ -52,6 +51,12 @@ def _setup_logging(verbose: bool) -> None:
     )
 
 
+def _safe_stem(name: str) -> str:
+    """Convert a playlist name to a safe filename stem."""
+    safe = "".join(c if c.isalnum() or c in " -_" else "_" for c in name)
+    return safe.strip().replace(" ", "_")[:64] or "playlist"
+
+
 _FORMAT_CHOICES = list(FORMATS) + ["all"]
 
 
@@ -61,7 +66,7 @@ def cli() -> None:
 
 
 # ---------------------------------------------------------------------------
-# generate subcommand (original behaviour)
+# generate subcommand
 # ---------------------------------------------------------------------------
 
 
@@ -154,9 +159,7 @@ def generate(  # pylint: disable=too-many-arguments,too-many-positional-argument
     input_mode = InputMode(mode) if mode else None
     parsed = parse_input_file(input_file, mode=input_mode)
     n_entries = len(parsed.artists) or len(parsed.albums) or len(parsed.tracks)
-    click.echo(
-        f"Parsed {input_file.name}: mode={parsed.mode.value}, entries={n_entries}"
-    )
+    click.echo(f"Parsed {input_file.name}: mode={parsed.mode.value}, entries={n_entries}")
 
     playlist = generate_playlist(
         parsed,
@@ -166,10 +169,8 @@ def generate(  # pylint: disable=too-many-arguments,too-many-positional-argument
         limit_per_source=limit,
     )
 
-    tracks_data = _load_tracks_data(playlist.id)
-    click.echo(
-        f"Playlist '{playlist.name}' built: {len(tracks_data)} tracks (db id={playlist.id})"
-    )
+    tracks_data = load_tracks_data(playlist.id)
+    click.echo(f"Playlist '{playlist.name}' built: {len(tracks_data)} tracks (db id={playlist.id})")
 
     stem = _safe_stem(name)
     if fmt == "all":
@@ -222,7 +223,7 @@ def generate(  # pylint: disable=too-many-arguments,too-many-positional-argument
 @click.option(
     "-v", "--verbose", is_flag=True, default=False, help="Enable debug logging."
 )
-def convert(  # pylint: disable=too-many-locals
+def convert(
     input_file: Path,
     name: str | None,
     output_dir: Path | None,
@@ -245,7 +246,7 @@ def convert(  # pylint: disable=too-many-locals
     out_dir = output_dir or config.output_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    rows = _parse_vdj_csv(input_file)
+    rows = parse_vdj_csv(input_file)
     click.echo(f"Loaded {len(rows)} tracks from {input_file.name}")
 
     deezer = DeezerClient()
@@ -259,324 +260,22 @@ def convert(  # pylint: disable=too-many-locals
 
         click.echo(f"\n[{i}/{len(rows)}] {artist} – {title}")
 
-        isrc = _resolve_isrc(title, artist, deezer, mb, candidates, always_select_first)
+        isrc = resolve_isrc(title, artist, deezer, mb, candidates, always_select_first)
 
         if isrc:
             click.echo(f"  ✓ ISRC: {isrc}")
         else:
             click.echo("  – No ISRC found, row will be written without one.")
 
-        enriched.append(
-            {"title": title, "artist": artist, "album": album, "isrc": isrc or ""}
-        )
+        enriched.append({"title": title, "artist": artist, "album": album, "isrc": isrc or ""})
 
     stem = _safe_stem(name or input_file.stem)
     out_path = out_dir / f"{stem}.csv"
-    _write_soundiiz_csv(enriched, out_path)
+    write_soundiiz_csv(enriched, out_path)
     click.echo(f"\nWrote {len(enriched)} tracks → {out_path}")
     click.echo("\nTo import into Soundiiz:")
     click.echo("  1. Go to soundiiz.com → Transfer → Import from File")
     click.echo(f"  2. Upload: {out_path}")
-
-
-# ---------------------------------------------------------------------------
-# VirtualDJ CSV parser
-# ---------------------------------------------------------------------------
-
-
-def _parse_vdj_csv(path: Path) -> list[dict[str, str]]:
-    """Parse a VirtualDJ CSV export into a list of track dicts.
-
-    VirtualDJ exports start with a ``sep=,`` hint line which we skip.
-    Expected columns (case-insensitive): Titel/Title, Interpret/Artist,
-    Album, BPM, Key.
-    """
-    text = path.read_text(encoding="utf-8-sig")
-    lines = text.splitlines()
-
-    # Drop the leading ``sep=,`` line if present
-    if lines and lines[0].strip().lower().startswith("sep="):
-        lines = lines[1:]
-
-    reader = csv.DictReader(lines)
-    # Normalise header names: strip quotes/whitespace, lower-case
-    if reader.fieldnames is None:
-        return []
-
-    _col_map = {
-        "titel": "title",
-        "title": "title",
-        "interpret": "artist",
-        "artist": "artist",
-        "album": "album",
-        "bpm": "bpm",
-        "key": "key",
-    }
-
-    rows: list[dict[str, str]] = []
-    for raw in reader:
-        row: dict[str, str] = {}
-        for k, v in raw.items():
-            norm = _col_map.get((k or "").strip().lower())
-            if norm:
-                row[norm] = (v or "").strip()
-        if row.get("title"):
-            row.setdefault("artist", "")
-            row.setdefault("album", "")
-            rows.append(row)
-    return rows
-
-
-# ---------------------------------------------------------------------------
-# ISRC resolution with interactive disambiguation
-# ---------------------------------------------------------------------------
-
-
-def _resolve_isrc(
-    title: str,
-    artist: str,
-    deezer: Any,
-    mb: Any,
-    n_candidates: int,
-    always_select_first: bool = False,
-) -> str | None:
-    """Search Deezer (then MusicBrainz) and return an ISRC, prompting when ambiguous."""
-
-    # --- Deezer ---
-    candidates = deezer.search_track_candidates(title, artist, limit=n_candidates)
-
-    if candidates:
-        chosen = _pick_candidate(
-            candidates, title, artist, source="Deezer", always_select_first=always_select_first
-        )
-        if chosen is not None:
-            # Fetch full track object to get ISRC
-            full = deezer.get_track(chosen["id"])
-            if full and full.isrc:
-                return full.isrc
-            # If Deezer has the track but no ISRC, fall through to MusicBrainz
-
-    # --- MusicBrainz fallback ---
-    click.echo("  → Trying MusicBrainz…")
-    mb_results = mb.search_recording(title, artist, limit=n_candidates)
-    if not mb_results:
-        return None
-
-    chosen_mb = _pick_mb_candidate(mb_results, title, artist, always_select_first=always_select_first)
-    if chosen_mb is None:
-        return None
-    isrcs: list[str] = chosen_mb.get("isrcs", [])
-    return isrcs[0] if isrcs else None
-
-
-def _pick_candidate(
-    candidates: list[dict],
-    title: str,
-    artist: str,
-    source: str,
-    always_select_first: bool = False,
-) -> dict | None:
-    """Interactively let the user choose among Deezer *candidates*.
-
-    Returns the chosen dict, or ``None`` if the user skips.
-    Automatically accepts when there is exactly one candidate that matches
-    title and artist exactly (case-insensitive), or when *always_select_first*
-    is ``True``.
-    """
-    # Try an automatic exact match first
-    tl = title.casefold()
-    al = artist.casefold()
-    exact = [
-        c
-        for c in candidates
-        if c.get("title", "").casefold() == tl
-        and (not al or c.get("artist", {}).get("name", "").casefold() == al)
-    ]
-    if len(exact) == 1:
-        c = exact[0]
-        click.echo(
-            f"  \u2192 Auto-matched [{source}]: "
-            f"{c.get('artist', {}).get('name', '?')} \u2013 {c.get('title', '?')}"
-        )
-        return c
-
-    if always_select_first:
-        c = candidates[0]
-        click.echo(
-            f"  \u2192 Auto-selected first [{source}]: "
-            f"{c.get('artist', {}).get('name', '?')} \u2013 {c.get('title', '?')}"
-        )
-        return c
-
-    # Prompt the user
-    click.echo(f"  Candidates from {source}:")
-    for idx, c in enumerate(candidates, 1):
-        a_name = c.get("artist", {}).get("name", "?")
-        alb_name = c.get("album", {}).get("title", "?")
-        click.echo(f"    [{idx}] {a_name} – {c.get('title', '?')}  (album: {alb_name})")
-
-    while True:
-        raw = (
-            click.prompt(
-                "  Pick number, Enter=1, s=skip",
-                default="1",
-                show_default=False,
-            )
-            .strip()
-            .lower()
-        )
-        if raw == "s":
-            return None
-        try:
-            n = int(raw)
-            if 1 <= n <= len(candidates):
-                return candidates[n - 1]
-        except ValueError:
-            pass
-        click.echo("  Invalid choice, try again.")
-
-
-def _pick_mb_candidate(
-    recordings: list[dict],
-    title: str,
-    artist: str,
-    always_select_first: bool = False,
-) -> dict | None:
-    """Interactively let the user choose among MusicBrainz *recordings*."""
-    # Filter to those with ISRCs only – no point picking one without
-    with_isrc = [r for r in recordings if r.get("isrcs")]
-    pool = with_isrc or recordings
-
-    if not pool:
-        return None
-
-    tl = title.casefold()
-    al = artist.casefold()
-    exact = [
-        r
-        for r in pool
-        if r.get("title", "").casefold() == tl
-        and (
-            not al
-            or any(
-                ac.get("artist", {}).get("name", "").casefold() == al
-                for ac in r.get("artist-credit", [])
-                if isinstance(ac, dict)
-            )
-        )
-    ]
-    if len(exact) == 1:
-        r = exact[0]
-        credit = " / ".join(
-            ac.get("artist", {}).get("name", "")
-            for ac in r.get("artist-credit", [])
-            if isinstance(ac, dict)
-        )
-        click.echo(f"  → Auto-matched [MusicBrainz]: {credit} – {r.get('title', '?')}")
-        return r
-
-    if always_select_first:
-        r = pool[0]
-        credit = " / ".join(
-            ac.get("artist", {}).get("name", "")
-            for ac in r.get("artist-credit", [])
-            if isinstance(ac, dict)
-        )
-        click.echo(f"  → Auto-selected first [MusicBrainz]: {credit} – {r.get('title', '?')}")
-        return r
-
-    click.echo("  Candidates from MusicBrainz:")
-    for idx, r in enumerate(pool, 1):
-        credit = " / ".join(
-            ac.get("artist", {}).get("name", "")
-            for ac in r.get("artist-credit", [])
-            if isinstance(ac, dict)
-        )
-        isrcs = r.get("isrcs", [])
-        isrc_str = isrcs[0] if isrcs else "no ISRC"
-        click.echo(f"    [{idx}] {credit} – {r.get('title', '?')}  ({isrc_str})")
-
-    while True:
-        raw = (
-            click.prompt(
-                "  Pick number, Enter=1, s=skip",
-                default="1",
-                show_default=False,
-            )
-            .strip()
-            .lower()
-        )
-        if raw == "s":
-            return None
-        try:
-            n = int(raw)
-            if 1 <= n <= len(pool):
-                return pool[n - 1]
-        except ValueError:
-            pass
-        click.echo("  Invalid choice, try again.")
-
-
-# ---------------------------------------------------------------------------
-# Soundiiz CSV writer
-# ---------------------------------------------------------------------------
-
-
-def _write_soundiiz_csv(tracks: list[dict[str, str]], path: Path) -> None:
-    """Write *tracks* as a Soundiiz-compatible CSV (title,artist,album,isrc)."""
-    with path.open("w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=["title", "artist", "album", "isrc"])
-        writer.writeheader()
-        writer.writerows(tracks)
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _load_tracks_data(playlist_id: int) -> list[dict]:
-    """Return ordered track dicts for *playlist_id* with artist/album names resolved."""
-    rows: list[dict] = []
-    with get_session() as db:
-        result = db.execute(
-            playlist_tracks.select()
-            .where(playlist_tracks.c.playlist_id == playlist_id)
-            .order_by(playlist_tracks.c.position)
-        ).fetchall()
-
-        for row in result:
-            t: Track | None = db.get(Track, row.track_id)
-            if t is None:
-                continue
-            artist_name = ""
-            if t.artist_id:
-                a: Artist | None = db.get(Artist, t.artist_id)
-                artist_name = a.name if a else ""
-            album_title = ""
-            if t.album_id:
-                al: Album | None = db.get(Album, t.album_id)
-                album_title = al.title if al else ""
-            rows.append(
-                {
-                    "id": t.id,
-                    "title": t.title,
-                    "artist": artist_name,
-                    "album": album_title,
-                    "duration": t.duration,
-                    "isrc": t.isrc,
-                    "rank": t.rank,
-                    "preview": t.preview,
-                    "link": t.link,
-                }
-            )
-    return rows
-
-
-def _safe_stem(name: str) -> str:
-    """Convert a playlist name to a safe filename stem."""
-    safe = "".join(c if c.isalnum() or c in " -_" else "_" for c in name)
-    return safe.strip().replace(" ", "_")[:64] or "playlist"
 
 
 if __name__ == "__main__":

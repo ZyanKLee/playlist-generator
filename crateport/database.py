@@ -8,7 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from .config import config
-from .models import Base
+from .models import Album, Artist, Base, Track, playlist_tracks
 
 # ---------------------------------------------------------------------------
 # Engine & session factory
@@ -49,6 +49,44 @@ def get_session() -> Generator[Session, None, None]:
 # ---------------------------------------------------------------------------
 # Cache helpers
 # ---------------------------------------------------------------------------
+
+
+def load_tracks_data(playlist_id: int) -> list[dict]:
+    """Return ordered track dicts for *playlist_id* with artist/album names resolved."""
+    rows: list[dict] = []
+    with get_session() as db:
+        result = db.execute(
+            playlist_tracks.select()
+            .where(playlist_tracks.c.playlist_id == playlist_id)
+            .order_by(playlist_tracks.c.position)
+        ).fetchall()
+
+        for row in result:
+            t: Track | None = db.get(Track, row.track_id)
+            if t is None:
+                continue
+            artist_name = ""
+            if t.artist_id:
+                a: Artist | None = db.get(Artist, t.artist_id)
+                artist_name = a.name if a else ""
+            album_title = ""
+            if t.album_id:
+                al: Album | None = db.get(Album, t.album_id)
+                album_title = al.title if al else ""
+            rows.append(
+                {
+                    "id": t.id,
+                    "title": t.title,
+                    "artist": artist_name,
+                    "album": album_title,
+                    "duration": t.duration,
+                    "isrc": t.isrc,
+                    "rank": t.rank,
+                    "preview": t.preview,
+                    "link": t.link,
+                }
+            )
+    return rows
 
 
 def is_fresh(cached_at: datetime | None, ttl_hours: int | None = None) -> bool:
