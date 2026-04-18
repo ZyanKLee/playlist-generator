@@ -159,7 +159,9 @@ def generate(  # pylint: disable=too-many-arguments,too-many-positional-argument
     input_mode = InputMode(mode) if mode else None
     parsed = parse_input_file(input_file, mode=input_mode)
     n_entries = len(parsed.artists) or len(parsed.albums) or len(parsed.tracks)
-    click.echo(f"Parsed {input_file.name}: mode={parsed.mode.value}, entries={n_entries}")
+    click.echo(
+        f"Parsed {input_file.name}: mode={parsed.mode.value}, entries={n_entries}"
+    )
 
     playlist = generate_playlist(
         parsed,
@@ -170,7 +172,9 @@ def generate(  # pylint: disable=too-many-arguments,too-many-positional-argument
     )
 
     tracks_data = load_tracks_data(playlist.id)
-    click.echo(f"Playlist '{playlist.name}' built: {len(tracks_data)} tracks (db id={playlist.id})")
+    click.echo(
+        f"Playlist '{playlist.name}' built: {len(tracks_data)} tracks (db id={playlist.id})"
+    )
 
     stem = _safe_stem(name)
     if fmt == "all":
@@ -223,7 +227,7 @@ def generate(  # pylint: disable=too-many-arguments,too-many-positional-argument
 @click.option(
     "-v", "--verbose", is_flag=True, default=False, help="Enable debug logging."
 )
-def convert(
+def convert(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
     input_file: Path,
     name: str | None,
     output_dir: Path | None,
@@ -267,7 +271,9 @@ def convert(
         else:
             click.echo("  – No ISRC found, row will be written without one.")
 
-        enriched.append({"title": title, "artist": artist, "album": album, "isrc": isrc or ""})
+        enriched.append(
+            {"title": title, "artist": artist, "album": album, "isrc": isrc or ""}
+        )
 
     stem = _safe_stem(name or input_file.stem)
     out_path = out_dir / f"{stem}.csv"

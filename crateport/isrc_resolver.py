@@ -12,7 +12,7 @@ from typing import Any
 import click
 
 
-def resolve_isrc(
+def resolve_isrc(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     title: str,
     artist: str,
     deezer: Any,
@@ -27,7 +27,11 @@ def resolve_isrc(
 
     if candidates:
         chosen = _pick_candidate(
-            candidates, title, artist, source="Deezer", always_select_first=always_select_first
+            candidates,
+            title,
+            artist,
+            source="Deezer",
+            always_select_first=always_select_first,
         )
         if chosen is not None:
             full = deezer.get_track(chosen["id"])
@@ -41,7 +45,9 @@ def resolve_isrc(
     if not mb_results:
         return None
 
-    chosen_mb = _pick_mb_candidate(mb_results, title, artist, always_select_first=always_select_first)
+    chosen_mb = _pick_mb_candidate(
+        mb_results, title, artist, always_select_first=always_select_first
+    )
     if chosen_mb is None:
         return None
     isrcs: list[str] = chosen_mb.get("isrcs", [])
@@ -92,7 +98,9 @@ def _pick_candidate(
 
     while True:
         raw = (
-            click.prompt("  Pick number, Enter=1, s=skip", default="1", show_default=False)
+            click.prompt(
+                "  Pick number, Enter=1, s=skip", default="1", show_default=False
+            )
             .strip()
             .lower()
         )
@@ -137,12 +145,16 @@ def _pick_mb_candidate(
     ]
     if len(exact) == 1:
         r = exact[0]
-        click.echo(f"  → Auto-matched [MusicBrainz]: {_mb_credit(r)} – {r.get('title', '?')}")
+        click.echo(
+            f"  → Auto-matched [MusicBrainz]: {_mb_credit(r)} – {r.get('title', '?')}"
+        )
         return r
 
     if always_select_first:
         r = pool[0]
-        click.echo(f"  → Auto-selected first [MusicBrainz]: {_mb_credit(r)} – {r.get('title', '?')}")
+        click.echo(
+            f"  → Auto-selected first [MusicBrainz]: {_mb_credit(r)} – {r.get('title', '?')}"
+        )
         return r
 
     click.echo("  Candidates from MusicBrainz:")
@@ -153,7 +165,9 @@ def _pick_mb_candidate(
 
     while True:
         raw = (
-            click.prompt("  Pick number, Enter=1, s=skip", default="1", show_default=False)
+            click.prompt(
+                "  Pick number, Enter=1, s=skip", default="1", show_default=False
+            )
             .strip()
             .lower()
         )

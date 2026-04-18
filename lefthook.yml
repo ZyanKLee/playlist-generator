@@ -1,0 +1,48 @@
+# https://github.com/evilmartians/lefthook
+#
+# Run manually:  lefthook run pre-commit
+# Install hooks: lefthook install
+#
+# Tools not yet in dev dependencies – suggested additions:
+#   mypy   – static type checker  (poetry add --group dev mypy)
+#   pytest – unit/integration tests  (poetry add --group dev pytest)
+#   bandit – security linter  (poetry add --group dev bandit[toml])
+#
+# Runner note: `poetry run` resolves to the system Python in this environment,
+# so we resolve the venv path via `poetry env list --full-path | awk '{print $1}'`
+# to strip the optional "(Activated)" suffix poetry appends.
+
+pre-commit:
+  parallel: true
+  commands:
+
+    black:
+      run: $(poetry env list --full-path | awk '{print $1}' | head -1)/bin/black crateport/
+      stage_fixed: true
+
+    isort:
+      run: $(poetry env list --full-path | awk '{print $1}' | head -1)/bin/isort crateport/
+      stage_fixed: true
+
+    pylint:
+      # Run on the whole package so cross-module checks stay accurate.
+      run: $(poetry env list --full-path | awk '{print $1}' | head -1)/bin/pylint crateport/
+
+    # -- Uncomment once mypy is added as a dev dependency --
+    # mypy:
+    #   run: $(poetry env list --full-path | awk '{print $1}' | head -1)/bin/mypy crateport/
+
+    # -- Uncomment once bandit is added as a dev dependency --
+    # bandit:
+    #   run: $(poetry env list --full-path | awk '{print $1}' | head -1)/bin/bandit -r crateport/ -ll
+
+pre-push:
+  parallel: true
+  commands:
+
+    poetry-check:
+      run: poetry check
+
+    # -- Uncomment once pytest + tests exist --
+    # pytest:
+    #   run: $(poetry env list --full-path | awk '{print $1}' | head -1)/bin/pytest
