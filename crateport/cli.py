@@ -213,6 +213,13 @@ def generate(  # pylint: disable=too-many-arguments,too-many-positional-argument
     help="Number of Deezer search candidates to fetch per track.",
 )
 @click.option(
+    "-1",
+    "--always-select-first",
+    is_flag=True,
+    default=False,
+    help="Non-interactively always pick the first candidate (no prompt).",
+)
+@click.option(
     "-v", "--verbose", is_flag=True, default=False, help="Enable debug logging."
 )
 def convert(  # pylint: disable=too-many-locals
@@ -220,6 +227,7 @@ def convert(  # pylint: disable=too-many-locals
     name: str | None,
     output_dir: Path | None,
     candidates: int,
+    always_select_first: bool,
     verbose: bool,
 ) -> None:
     """Convert a VirtualDJ CSV export to a Soundiiz-compatible CSV with ISRC.
@@ -251,7 +259,7 @@ def convert(  # pylint: disable=too-many-locals
 
         click.echo(f"\n[{i}/{len(rows)}] {artist} – {title}")
 
-        isrc = _resolve_isrc(title, artist, deezer, mb, candidates)
+        isrc = _resolve_isrc(title, artist, deezer, mb, candidates, always_select_first)
 
         if isrc:
             click.echo(f"  ✓ ISRC: {isrc}")
@@ -330,6 +338,7 @@ def _resolve_isrc(
     deezer: Any,
     mb: Any,
     n_candidates: int,
+    always_select_first: bool = False,
 ) -> str | None:
     """Search Deezer (then MusicBrainz) and return an ISRC, prompting when ambiguous."""
 
@@ -337,7 +346,9 @@ def _resolve_isrc(
     candidates = deezer.search_track_candidates(title, artist, limit=n_candidates)
 
     if candidates:
-        chosen = _pick_candidate(candidates, title, artist, source="Deezer")
+        chosen = _pick_candidate(
+            candidates, title, artist, source="Deezer", always_select_first=always_select_first
+        )
         if chosen is not None:
             # Fetch full track object to get ISRC
             full = deezer.get_track(chosen["id"])
@@ -351,7 +362,7 @@ def _resolve_isrc(
     if not mb_results:
         return None
 
-    chosen_mb = _pick_mb_candidate(mb_results, title, artist)
+    chosen_mb = _pick_mb_candidate(mb_results, title, artist, always_select_first=always_select_first)
     if chosen_mb is None:
         return None
     isrcs: list[str] = chosen_mb.get("isrcs", [])
@@ -359,13 +370,18 @@ def _resolve_isrc(
 
 
 def _pick_candidate(
-    candidates: list[dict], title: str, artist: str, source: str
+    candidates: list[dict],
+    title: str,
+    artist: str,
+    source: str,
+    always_select_first: bool = False,
 ) -> dict | None:
     """Interactively let the user choose among Deezer *candidates*.
 
     Returns the chosen dict, or ``None`` if the user skips.
     Automatically accepts when there is exactly one candidate that matches
-    title and artist exactly (case-insensitive).
+    title and artist exactly (case-insensitive), or when *always_select_first*
+    is ``True``.
     """
     # Try an automatic exact match first
     tl = title.casefold()
@@ -380,6 +396,14 @@ def _pick_candidate(
         c = exact[0]
         click.echo(
             f"  \u2192 Auto-matched [{source}]: "
+            f"{c.get('artist', {}).get('name', '?')} \u2013 {c.get('title', '?')}"
+        )
+        return c
+
+    if always_select_first:
+        c = candidates[0]
+        click.echo(
+            f"  \u2192 Auto-selected first [{source}]: "
             f"{c.get('artist', {}).get('name', '?')} \u2013 {c.get('title', '?')}"
         )
         return c
@@ -412,7 +436,12 @@ def _pick_candidate(
         click.echo("  Invalid choice, try again.")
 
 
-def _pick_mb_candidate(recordings: list[dict], title: str, artist: str) -> dict | None:
+def _pick_mb_candidate(
+    recordings: list[dict],
+    title: str,
+    artist: str,
+    always_select_first: bool = False,
+) -> dict | None:
     """Interactively let the user choose among MusicBrainz *recordings*."""
     # Filter to those with ISRCs only – no point picking one without
     with_isrc = [r for r in recordings if r.get("isrcs")]
@@ -444,6 +473,16 @@ def _pick_mb_candidate(recordings: list[dict], title: str, artist: str) -> dict 
             if isinstance(ac, dict)
         )
         click.echo(f"  → Auto-matched [MusicBrainz]: {credit} – {r.get('title', '?')}")
+        return r
+
+    if always_select_first:
+        r = pool[0]
+        credit = " / ".join(
+            ac.get("artist", {}).get("name", "")
+            for ac in r.get("artist-credit", [])
+            if isinstance(ac, dict)
+        )
+        click.echo(f"  → Auto-selected first [MusicBrainz]: {credit} – {r.get('title', '?')}")
         return r
 
     click.echo("  Candidates from MusicBrainz:")
