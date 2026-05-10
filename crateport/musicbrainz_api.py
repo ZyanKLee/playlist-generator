@@ -22,6 +22,10 @@ _RATE_LIMIT_DELAY = 1.1  # seconds — MusicBrainz requires max 1 req/s
 _DEFAULT_USER_AGENT = "crateport/1.0 (https://github.com/ZyanKLee/crateport)"
 
 
+class MusicBrainzTimeoutError(Exception):
+    """Raised when the MusicBrainz API times out."""
+
+
 class MusicBrainzError(Exception):
     """Raised when the MusicBrainz API returns an unexpected response."""
 
@@ -49,9 +53,18 @@ class MusicBrainzClient:
             p.update(params)
         logger.debug("MusicBrainz GET %s %s", url, p)
         time.sleep(_RATE_LIMIT_DELAY)
-        resp = self._session.get(url, params=p, timeout=15)
-        resp.raise_for_status()
-        return resp.json()
+        try:
+            resp = self._session.get(url, params=p, timeout=15)
+            resp.raise_for_status()
+            return resp.json()
+        except (requests.Timeout, requests.ConnectionError) as exc:
+            logger.warning(
+                "MusicBrainz API timeout/connection error for %s: %s", url, exc
+            )
+            raise MusicBrainzTimeoutError(f"Timeout/connection error: {exc}") from exc
+        except requests.RequestException as exc:
+            logger.warning("MusicBrainz API error for %s: %s", url, exc)
+            raise MusicBrainzError(f"Request error: {exc}") from exc
 
     # ------------------------------------------------------------------
     # Artist
@@ -64,7 +77,14 @@ class MusicBrainzClient:
         case-insensitive match is accepted; the first-result fallback that
         caused false positives in the Deezer client is deliberately avoided.
         """
-        data = self._get("/artist", {"query": f'artist:"{name}"', "limit": 5})
+        try:
+            data = self._get("/artist", {"query": f'artist:"{name}"', "limit": 5})
+        except MusicBrainzTimeoutError:
+            logger.warning("MusicBrainz timeout while searching for artist: %r", name)
+            return None
+        except MusicBrainzError:
+            return None
+
         artists: list[dict] = data.get("artists", [])
         if not artists:
             logger.warning("MusicBrainz: no artist found for %r", name)
@@ -103,7 +123,18 @@ class MusicBrainzClient:
         query = f'recording:"{title}"'
         if artist:
             query += f' AND artist:"{artist}"'
-        data = self._get("/recording", {"query": query, "inc": "isrcs", "limit": limit})
+        try:
+            data = self._get(
+                "/recording", {"query": query, "inc": "isrcs", "limit": limit}
+            )
+        except MusicBrainzTimeoutError:
+            logger.warning(
+                "MusicBrainz timeout while searching for recording: %r", title
+            )
+            return []
+        except MusicBrainzError:
+            return []
+
         recordings: list[dict] = data.get("recordings", [])
         logger.debug(
             "MusicBrainz: search_recording %r → %d results", title, len(recordings)
@@ -121,10 +152,20 @@ class MusicBrainzClient:
         # Over-fetch slightly so that recordings without ISRCs can be
         # skipped without falling short of the requested limit.
         fetch = min(limit * 3, 100)
-        data = self._get(
-            "/recording",
-            {"artist": mbid, "inc": "isrcs", "limit": fetch, "offset": 0},
-        )
+        try:
+            data = self._get(
+                "/recording",
+                {"artist": mbid, "inc": "isrcs", "limit": fetch, "offset": 0},
+            )
+        except MusicBrainzTimeoutError:
+            logger.warning(
+                "MusicBrainz timeout while fetching artist recordings for mbid=%s",
+                mbid,
+            )
+            return []
+        except MusicBrainzError:
+            return []
+
         recordings: list[dict] = data.get("recordings", [])
         logger.debug(
             "MusicBrainz: %d recordings fetched for mbid=%s", len(recordings), mbid

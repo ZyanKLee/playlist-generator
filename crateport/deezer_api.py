@@ -31,6 +31,10 @@ class DeezerAPIError(Exception):
     """Raised when the Deezer API returns an error payload."""
 
 
+class DeezerTimeoutError(Exception):
+    """Raised when the Deezer API times out."""
+
+
 class DeezerClient:
     """Thin wrapper around the Deezer REST API with SQLAlchemy caching."""
 
@@ -51,15 +55,22 @@ class DeezerClient:
             p["access_token"] = self._token
         logger.debug("GET %s %s", url, p)
         time.sleep(_RATE_LIMIT_DELAY)
-        resp = self._session.get(url, params=p, timeout=15)
-        resp.raise_for_status()
-        data = resp.json()
-        if isinstance(data, dict) and "error" in data:
-            err = data["error"]
-            raise DeezerAPIError(
-                f"{err.get('type', 'Error')} {err.get('code')}: {err.get('message')}"
-            )
-        return data
+        try:
+            resp = self._session.get(url, params=p, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+            if isinstance(data, dict) and "error" in data:
+                err = data["error"]
+                raise DeezerAPIError(
+                    f"{err.get('type', 'Error')} {err.get('code')}: {err.get('message')}"
+                )
+            return data
+        except (requests.Timeout, requests.ConnectionError) as exc:
+            logger.warning("Deezer API timeout/connection error for %s: %s", url, exc)
+            raise DeezerTimeoutError(f"Timeout/connection error: {exc}") from exc
+        except requests.RequestException as exc:
+            logger.warning("Deezer API error for %s: %s", url, exc)
+            raise DeezerAPIError(f"Request error: {exc}") from exc
 
     def _post(self, path: str, params: dict[str, Any] | None = None) -> Any:
         url = f"{_BASE}{path}"
@@ -67,15 +78,22 @@ class DeezerClient:
         if self._token:
             p["access_token"] = self._token
         logger.debug("POST %s %s", url, p)
-        resp = self._session.post(url, params=p, timeout=15)
-        resp.raise_for_status()
-        data = resp.json()
-        if isinstance(data, dict) and "error" in data:
-            err = data["error"]
-            raise DeezerAPIError(
-                f"{err.get('type', 'Error')} {err.get('code')}: {err.get('message')}"
-            )
-        return data
+        try:
+            resp = self._session.post(url, params=p, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+            if isinstance(data, dict) and "error" in data:
+                err = data["error"]
+                raise DeezerAPIError(
+                    f"{err.get('type', 'Error')} {err.get('code')}: {err.get('message')}"
+                )
+            return data
+        except (requests.Timeout, requests.ConnectionError) as exc:
+            logger.warning("Deezer API timeout/connection error for %s: %s", url, exc)
+            raise DeezerTimeoutError(f"Timeout/connection error: {exc}") from exc
+        except requests.RequestException as exc:
+            logger.warning("Deezer API error for %s: %s", url, exc)
+            raise DeezerAPIError(f"Request error: {exc}") from exc
 
     # ------------------------------------------------------------------
     # Artist
@@ -93,7 +111,14 @@ class DeezerClient:
                 logger.debug("Cache hit: artist %r", name)
                 return cached
 
-            data = self._get("/search/artist", {"q": name, "limit": 5})
+            try:
+                data = self._get("/search/artist", {"q": name, "limit": 5})
+            except DeezerTimeoutError:
+                logger.warning("Deezer timeout while searching for artist: %r", name)
+                return None
+            except DeezerAPIError:
+                return None
+
             items = data.get("data", [])
             if not items:
                 logger.warning("No artist found for %r", name)
@@ -132,7 +157,16 @@ class DeezerClient:
                     logger.debug("Cache hit: top tracks for artist %s", artist_id)
                     return existing
 
-            data = self._get(f"/artist/{artist_id}/top", {"limit": limit})
+            try:
+                data = self._get(f"/artist/{artist_id}/top", {"limit": limit})
+            except (DeezerTimeoutError, DeezerAPIError) as exc:
+                logger.warning(
+                    "Deezer API error fetching top tracks for artist %s: %s",
+                    artist_id,
+                    exc,
+                )
+                return []
+
             items = data.get("data", [])
             tracks: list[Track] = []
             for item in items:
@@ -177,7 +211,14 @@ class DeezerClient:
                 logger.debug("Cache hit: album %r", title)
                 return cached
 
-            data = self._get("/search/album", {"q": query, "limit": 5})
+            try:
+                data = self._get("/search/album", {"q": query, "limit": 5})
+            except (DeezerTimeoutError, DeezerAPIError) as exc:
+                logger.warning(
+                    "Deezer API error searching for album %r: %s", title, exc
+                )
+                return None
+
             items = data.get("data", [])
             if not items:
                 logger.warning("No album found for %r", title)
@@ -204,7 +245,16 @@ class DeezerClient:
                     logger.debug("Cache hit: tracks for album %s", album_id)
                     return existing
 
-            data = self._get(f"/album/{album_id}/tracks")
+            try:
+                data = self._get(f"/album/{album_id}/tracks")
+            except (DeezerTimeoutError, DeezerAPIError) as exc:
+                logger.warning(
+                    "Deezer API error fetching album tracks for album %s: %s",
+                    album_id,
+                    exc,
+                )
+                return []
+
             items = data.get("data", [])
             tracks = [_upsert_track(db, item, album_id=album_id) for item in items]
         # Session is closed; enrich in separate per-track sessions
@@ -226,7 +276,12 @@ class DeezerClient:
                 logger.debug("Cache hit (isrc): track %s", track_id)
                 return cached
 
-            data = self._get(f"/track/{track_id}")
+            try:
+                data = self._get(f"/track/{track_id}")
+            except (DeezerTimeoutError, DeezerAPIError) as exc:
+                logger.warning("Deezer API error fetching track %s: %s", track_id, exc)
+                return None
+
             track = _upsert_track(db, data)
             return track
 
@@ -263,6 +318,9 @@ class DeezerClient:
                 return cached
         try:
             data = self._get(f"/track/isrc/{isrc}")
+        except DeezerTimeoutError:
+            logger.debug("Deezer timeout for ISRC %s", isrc)
+            return None
         except DeezerAPIError as exc:
             logger.debug("ISRC %s not found on Deezer: %s", isrc, exc)
             return None
@@ -290,7 +348,11 @@ class DeezerClient:
         query = f'track:"{title}"'
         if artist:
             query += f' artist:"{artist}"'
-        data = self._get("/search/track", {"q": query, "limit": limit})
+        try:
+            data = self._get("/search/track", {"q": query, "limit": limit})
+        except (DeezerTimeoutError, DeezerAPIError) as exc:
+            logger.warning("Deezer API error searching for track %r: %s", title, exc)
+            return []
         return data.get("data", [])
 
     def search_track(
@@ -314,7 +376,14 @@ class DeezerClient:
             if album:
                 query += f' album:"{album}"'
 
-            data = self._get("/search/track", {"q": query, "limit": 5})
+            try:
+                data = self._get("/search/track", {"q": query, "limit": 5})
+            except (DeezerTimeoutError, DeezerAPIError) as exc:
+                logger.warning(
+                    "Deezer API error searching for track %r: %s", title, exc
+                )
+                return None
+
             items = data.get("data", [])
             if not items:
                 logger.warning("No track found for %r (artist=%r)", title, artist)
@@ -338,16 +407,28 @@ class DeezerClient:
     # Playlist management (requires auth)
     # ------------------------------------------------------------------
 
-    def create_playlist(self, user_id: int | str, title: str) -> int:
-        """Create a new Deezer playlist and return its ID."""
-        data = self._post(f"/user/{user_id}/playlists", {"title": title})
-        return int(data["id"])
+    def create_playlist(self, user_id: int | str, title: str) -> int | None:
+        """Create a new Deezer playlist and return its ID, or None on error."""
+        try:
+            data = self._post(f"/user/{user_id}/playlists", {"title": title})
+            return int(data["id"])
+        except (DeezerTimeoutError, DeezerAPIError) as exc:
+            logger.warning(
+                "Deezer API error creating playlist for user %s: %s", user_id, exc
+            )
+            return None
 
     def add_tracks_to_playlist(self, playlist_id: int, track_ids: list[int]) -> bool:
         """Add tracks to a Deezer playlist (max 1000 IDs per call)."""
-        songs = ",".join(str(t) for t in track_ids)
-        self._post(f"/playlist/{playlist_id}/tracks", {"songs": songs})
-        return True
+        try:
+            songs = ",".join(str(t) for t in track_ids)
+            self._post(f"/playlist/{playlist_id}/tracks", {"songs": songs})
+            return True
+        except (DeezerTimeoutError, DeezerAPIError) as exc:
+            logger.warning(
+                "Deezer API error adding tracks to playlist %s: %s", playlist_id, exc
+            )
+            return False
 
     def update_playlist(
         self,
@@ -357,18 +438,28 @@ class DeezerClient:
         public: bool | None = None,
     ) -> bool:
         """Update playlist metadata."""
-        params: dict[str, Any] = {}
-        if description is not None:
-            params["description"] = description
-        if public is not None:
-            params["public"] = 1 if public else 0
-        if params:
-            self._post(f"/playlist/{playlist_id}", params)
-        return True
+        try:
+            params: dict[str, Any] = {}
+            if description is not None:
+                params["description"] = description
+            if public is not None:
+                params["public"] = 1 if public else 0
+            if params:
+                self._post(f"/playlist/{playlist_id}", params)
+            return True
+        except (DeezerTimeoutError, DeezerAPIError) as exc:
+            logger.warning(
+                "Deezer API error updating playlist %s: %s", playlist_id, exc
+            )
+            return False
 
-    def get_me(self) -> dict[str, Any]:
-        """Return the authenticated user's profile."""
-        return self._get("/user/me")
+    def get_me(self) -> dict[str, Any] | None:
+        """Return the authenticated user's profile, or None on error."""
+        try:
+            return self._get("/user/me")
+        except (DeezerTimeoutError, DeezerAPIError) as exc:
+            logger.warning("Deezer API error fetching user profile: %s", exc)
+            return None
 
 
 # ---------------------------------------------------------------------------
