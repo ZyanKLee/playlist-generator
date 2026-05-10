@@ -1,6 +1,28 @@
 # CHANGELOG
 
 
+## v1.1.0 (2026-05-10)
+
+### Chores
+
+- **deps**: Update dependencies in pyproject.toml
+  ([`875e490`](https://github.com/ZyanKLee/crateport/commit/875e49075dc93ce48848b6a2bed6edccd5e9733e))
+
+### Features
+
+- Add Git hooks management with Lefthook and update dependencies
+  ([`404ac8c`](https://github.com/ZyanKLee/crateport/commit/404ac8c5a567b24fbf2c9ae1aad78ebdafee7032))
+
+- Add option to always select the first candidate in ISRC resolution
+  ([`9ac7893`](https://github.com/ZyanKLee/crateport/commit/9ac78939906eaf4a604783f6abd18239db2066cc))
+
+- Add timeout error handling for Deezer and MusicBrainz API requests
+  ([`6cd7028`](https://github.com/ZyanKLee/crateport/commit/6cd702836c9fbe97275fc867f8aa0a09a90b79ce))
+
+- Implement ISRC resolution and CSV parsing/writing for VirtualDJ and Soundiiz
+  ([`da2aae5`](https://github.com/ZyanKLee/crateport/commit/da2aae5fedae51161079afaa79e44766fe3d210a))
+
+
 ## v1.0.3 (2026-03-13)
 
 
